@@ -23,6 +23,7 @@ import com.yahoo.elide.standalone.models.Post;
 import io.swagger.models.Info;
 import io.swagger.models.Swagger;
 import org.apache.http.HttpStatus;
+import org.glassfish.hk2.api.ServiceLocator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,8 @@ import java.util.Properties;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class ElideStandaloneTest {
     private ElideStandalone elide;
+
+    private static final String JSONAPI_CONTENT_TYPE = "application/vnd.api+json";
 
     @BeforeAll
     public void init() throws Exception {

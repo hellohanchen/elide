@@ -23,7 +23,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableList;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -391,11 +390,16 @@ public final class GraphQLDSL {
      * @see <a href="https://graphql.org/learn/schema/#object-types-and-fields">Object Types and Fields</a>
      */
     public static Selection field(String name, SelectionSet... selectionSet) {
-        return field(null, name, selectionSet);
+        List<SelectionSet> ss = Arrays.stream(selectionSet)
+                .map(i -> (SelectionSet) i)
+                .collect(Collectors.toList());
+        return new Field(null, name, Arguments.emptyArgument(), relayWrap(ss));
     }
 
     public static Selection field(String alias, String name, SelectionSet... selectionSet) {
-        List<SelectionSet> ss = ImmutableList.copyOf(selectionSet);
+        List<SelectionSet> ss = Arrays.stream(selectionSet)
+                .map(i -> (SelectionSet) i)
+                .collect(Collectors.toList());
         return new Field(alias, name, Arguments.emptyArgument(), relayWrap(ss));
     }
 
