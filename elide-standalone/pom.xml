@@ -8,7 +8,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.yahoo.elide</groupId>
     <artifactId>elide-standalone</artifactId>
-    <version>4.5.2-SNAPSHOT</version>
+    <version>4.5.3-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>Elide Standalone</name>
     <description>Elide Standalone Application</description>
@@ -16,7 +16,7 @@
     <parent>
         <groupId>com.yahoo.elide</groupId>
         <artifactId>elide-parent-pom</artifactId>
-        <version>4.5.2-SNAPSHOT</version>
+        <version>4.5.3-SNAPSHOT</version>
     </parent>
 
     <licenses>
@@ -62,17 +62,17 @@
         <dependency>
             <groupId>com.yahoo.elide</groupId>
             <artifactId>elide-datastore-jpa</artifactId>
-            <version>4.5.2-SNAPSHOT</version>
+            <version>4.5.3-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.yahoo.elide</groupId>
             <artifactId>elide-graphql</artifactId>
-            <version>4.5.2-SNAPSHOT</version>
+            <version>4.5.3-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.yahoo.elide</groupId>
             <artifactId>elide-swagger</artifactId>
-            <version>4.5.2-SNAPSHOT</version>
+            <version>4.5.3-SNAPSHOT</version>
         </dependency>
 
         <!-- JPA -->
@@ -85,7 +85,7 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>27.1-jre</version>
+            <version>23.0</version>
         </dependency>
 
         <!-- Hibernate -->
@@ -193,10 +193,17 @@
 
         <!-- Test -->
         <dependency>
-            <groupId>org.testng</groupId>
-            <artifactId>testng</artifactId>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.5.2</version>
             <scope>test</scope>
-            <version>6.10</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.5.2</version>
+            <scope>test</scope>
         </dependency>
 
         <!-- H2 -->
@@ -239,7 +246,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.0.2</version>
+                <version>3.1.2</version>
             </plugin>
         </plugins>
     </build>
