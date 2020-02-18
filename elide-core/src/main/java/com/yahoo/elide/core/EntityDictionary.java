@@ -1,5 +1,6 @@
 /*
- * Copyright 2016, Yahoo Inc.
+ * Copyright 2018, Yahoo Inc.
+ * Copyright 2018, the original author or authors.
  * Licensed under the Apache License, Version 2.0
  * See LICENSE file in project root for terms.
  */
@@ -13,8 +14,8 @@ import com.yahoo.elide.annotation.ComputedRelationship;
 import com.yahoo.elide.annotation.Exclude;
 import com.yahoo.elide.annotation.Include;
 import com.yahoo.elide.annotation.MappedInterface;
+import com.yahoo.elide.annotation.SecurityCheck;
 import com.yahoo.elide.annotation.SharePermission;
-import com.yahoo.elide.core.exceptions.DuplicateMappingException;
 import com.yahoo.elide.core.exceptions.HttpStatusException;
 import com.yahoo.elide.core.exceptions.InternalServerErrorException;
 import com.yahoo.elide.core.exceptions.InvalidAttributeException;
@@ -24,6 +25,7 @@ import com.yahoo.elide.security.checks.prefab.Collections.AppendOnly;
 import com.yahoo.elide.security.checks.prefab.Collections.RemoveOnly;
 import com.yahoo.elide.security.checks.prefab.Common;
 import com.yahoo.elide.security.checks.prefab.Role;
+import com.yahoo.elide.utils.ClassScanner;
 import com.yahoo.elide.utils.coerce.CoerceUtil;
 
 import com.google.common.collect.BiMap;
@@ -168,11 +170,35 @@ public class EntityDictionary {
         return m;
     }
 
+    /**
+     * Returns an entity binding if the provided class has been bound in the dictionary.
+     * Otherwise the behavior depends on whether the unbound class is an Entity or not.
+     * If it is not an Entity, we return an EMPTY_BINDING.  This preserves existing behavior for relationships
+     * which are entities but not bound.  Otherwise, we throw an exception - which also preserves behavior
+     * for unbound non-entities.
+     * @param entityClass
+     * @return
+     */
     protected EntityBinding getEntityBinding(Class<?> entityClass) {
         if (isMappedInterface(entityClass)) {
             return EMPTY_BINDING;
         }
-        return entityBindings.getOrDefault(lookupEntityClass(entityClass), EMPTY_BINDING);
+
+        //Common case of no inheritance.  This lookup is a performance boost so we don't have to do reflection.
+        EntityBinding binding = entityBindings.get(entityClass);
+        if (binding != null) {
+            return binding;
+        }
+
+        Class<?> declaredClass = lookupBoundClass(entityClass);
+
+        if (declaredClass != null) {
+            return entityBindings.get(declaredClass);
+        }
+
+        //Will throw an exception if entityClass is not an entity.
+        lookupEntityClass(entityClass);
+        return EMPTY_BINDING;
     }
 
     public boolean isMappedInterface(Class<?> interfaceClass) {
@@ -808,24 +834,20 @@ public class EntityDictionary {
      * @param cls Entity bean class
      */
     public void bindEntity(Class<?> cls) {
-        if (entityBindings.getOrDefault(lookupEntityClass(cls), EMPTY_BINDING) != EMPTY_BINDING) {
+        Class<?> declaredClass = lookupIncludeClass(cls);
+
+        if (declaredClass == null) {
+            log.trace("Missing include or excluded class {}", cls.getName());
             return;
         }
 
-        Annotation annotation = getFirstAnnotation(cls, Arrays.asList(Include.class, Exclude.class));
-        Include include = annotation instanceof Include ? (Include) annotation : null;
-        Exclude exclude = annotation instanceof Exclude ? (Exclude) annotation : null;
-        Entity entity = (Entity) getFirstAnnotation(cls, Arrays.asList(Entity.class));
-
-        if (exclude != null) {
-            log.trace("Exclude {}", cls.getName());
+        if (isClassBound(declaredClass)) {
+            //Ignore duplicate bindings.
             return;
         }
 
-        if (include == null) {
-            log.trace("Missing include {}", cls.getName());
-            return;
-        }
+        Include include = (Include) getFirstAnnotation(declaredClass, Arrays.asList(Include.class));
+        Entity entity = (Entity) getFirstAnnotation(declaredClass, Arrays.asList(Entity.class));
 
         String name;
         if (entity == null || "".equals(entity.name())) {
@@ -841,15 +863,10 @@ public class EntityDictionary {
             type = include.type();
         }
 
-        Class<?> duplicate = bindJsonApiToEntity.put(type, cls);
-        if (duplicate != null && !duplicate.equals(cls)) {
-            log.error("Duplicate binding {} for {}, {}", type, cls, duplicate);
-            throw new DuplicateMappingException(type + " " + cls.getName() + ":" + duplicate.getName());
-        }
-
-        entityBindings.putIfAbsent(lookupEntityClass(cls), new EntityBinding(this, cls, type, name));
+        bindJsonApiToEntity.put(type, declaredClass);
+        entityBindings.put(declaredClass, new EntityBinding(this, declaredClass, type, name));
         if (include.rootLevel()) {
-            bindEntityRoots.add(cls);
+            bindEntityRoots.add(declaredClass);
         }
     }
 
@@ -938,7 +955,7 @@ public class EntityDictionary {
         Annotation annotation = null;
         for (Class<?> cls = entityClass; annotation == null && cls != null; cls = cls.getSuperclass()) {
             for (Class<? extends Annotation> annotationClass : annotationClassList) {
-                annotation = cls.getAnnotation(annotationClass);
+                annotation = cls.getDeclaredAnnotation(annotationClass);
                 if (annotation != null) {
                     break;
                 }
@@ -947,7 +964,7 @@ public class EntityDictionary {
         // no class annotation, try packages
         for (Package pkg = entityClass.getPackage(); annotation == null && pkg != null; pkg = getParentPackage(pkg)) {
             for (Class<? extends Annotation> annotationClass : annotationClassList) {
-                annotation = pkg.getAnnotation(annotationClass);
+                annotation = pkg.getDeclaredAnnotation(annotationClass);
                 if (annotation != null) {
                     break;
                 }
@@ -979,7 +996,11 @@ public class EntityDictionary {
         try {
             AccessibleObject idField = null;
             for (Class<?> cls = value.getClass(); idField == null && cls != null; cls = cls.getSuperclass()) {
-                idField = getEntityBinding(cls).getIdField();
+                try {
+                    idField = getEntityBinding(cls).getIdField();
+                } catch (NullPointerException e) {
+                    log.warn("Class: {} ID Field: {}", cls.getSimpleName(), idField);
+                }
             }
             if (idField instanceof Field) {
                 return String.valueOf(((Field) idField).get(value));
@@ -1029,17 +1050,85 @@ public class EntityDictionary {
      * @return class with Entity annotation
      */
     public Class<?> lookupEntityClass(Class<?> objClass) {
+        Class<?> declaringClass = lookupAnnotationDeclarationClass(objClass, Entity.class);
+        if (declaringClass != null) {
+            return declaringClass;
+        }
+        throw new IllegalArgumentException("Unbound Entity " + objClass);
+    }
+
+    /**
+     * Follow for this class or super-class for Include annotation.
+     *
+     * @param objClass provided class
+     * @return class with Include annotation or
+     */
+    public Class<?> lookupIncludeClass(Class<?> objClass) {
+        Annotation first = getFirstAnnotation(objClass, Arrays.asList(Exclude.class, Include.class));
+        if (first instanceof Include) {
+            return objClass;
+        }
+        return null;
+    }
+
+    /**
+     * Search a class hierarchy to find the first instance of a declared annotation.
+     * @param objClass The class to start searching.
+     * @param annotationClass The annotation to search for.
+     * @return The class which declares the annotation or null.
+     */
+    public Class<?> lookupAnnotationDeclarationClass(Class<?> objClass, Class<? extends Annotation> annotationClass) {
         for (Class<?> cls = objClass; cls != null; cls = cls.getSuperclass()) {
-            EntityBinding binding = entityBindings.getOrDefault(cls, EMPTY_BINDING);
-            if (binding != EMPTY_BINDING) {
-                return binding.entityClass;
-            }
-            if (cls.isAnnotationPresent(Entity.class)) {
+            if (cls.getDeclaredAnnotation(annotationClass) != null) {
                 return cls;
             }
         }
-        throw new IllegalArgumentException("Unknown Entity " + objClass);
+        return null;
     }
+
+    /**
+     * Return bound entity or null.
+     *
+     * @param objClass provided class
+     * @return Bound class.
+     */
+    public Class<?> lookupBoundClass(Class<?> objClass) {
+        //Common case - we can avoid reflection by checking the map ...
+        EntityBinding binding = entityBindings.getOrDefault(objClass, EMPTY_BINDING);
+        if (binding != EMPTY_BINDING) {
+            return binding.entityClass;
+        }
+
+        Class<?> declaredClass = lookupIncludeClass(objClass);
+        if (declaredClass == null) {
+            return null;
+        }
+
+        binding = entityBindings.getOrDefault(declaredClass, EMPTY_BINDING);
+        if (binding != EMPTY_BINDING) {
+            return binding.entityClass;
+        }
+
+        try {
+            //Special Case for ORM proxied objects.  If the class is a proxy,
+            //and it is unbound, try the superclass.
+            return lookupEntityClass(declaredClass.getSuperclass());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Return if the class has been bound or not.  Only safe to call while binding an entity (does not consider
+     * ORM proxy objects).
+     *
+     * @param objClass provided class
+     * @return true if the class is already bound.
+     */
+    private boolean isClassBound(Class<?> objClass) {
+        return (entityBindings.getOrDefault(objClass, EMPTY_BINDING) != EMPTY_BINDING);
+    }
+
 
     /**
      * Retrieve the accessible object for a field from a target object.
@@ -1097,6 +1186,27 @@ public class EntityDictionary {
 
     public boolean isAttribute(Class<?> entityClass, String attributeName) {
         return getEntityBinding(entityClass).attributes.contains(attributeName);
+    }
+
+    /**
+     * Scan for security checks and automatically bind them to the dictionary.
+     */
+    public void scanForSecurityChecks() {
+
+        // Logic is based on https://github.com/illyasviel/elide-spring-boot/blob/master
+        // /elide-spring-boot-autoconfigure/src/main/java/org/illyasviel/elide
+        // /spring/boot/autoconfigure/ElideAutoConfiguration.java
+
+        for (Class<?> cls : ClassScanner.getAnnotatedClasses(SecurityCheck.class)) {
+            if (Check.class.isAssignableFrom(cls)) {
+                SecurityCheck securityCheckMeta = cls.getAnnotation(SecurityCheck.class);
+                log.debug("Register Elide Check [{}] with expression [{}]",
+                        cls.getCanonicalName(), securityCheckMeta.value());
+                checkNames.put(securityCheckMeta.value(), cls.asSubclass(Check.class));
+            } else {
+                throw new IllegalStateException("Class annotated with SecurityCheck is not a Check");
+            }
+        }
     }
 
     /**
@@ -1191,10 +1301,8 @@ public class EntityDictionary {
             for (String relationship : getElideBoundRelationships(clazz)) {
                 Class<?> relationshipClass = getParameterizedType(clazz, relationship);
 
-                try {
-                    lookupEntityClass(relationshipClass);
-                } catch (IllegalArgumentException e) {
 
+                if (lookupBoundClass(relationshipClass) == null) {
                     /* The relationship hasn't been bound */
                     continue;
                 }
@@ -1377,7 +1485,7 @@ public class EntityDictionary {
      * @param entityClass the class to bind.
      */
     private void bindIfUnbound(Class<?> entityClass) {
-        if (! entityBindings.containsKey(lookupEntityClass(entityClass))) {
+        if (! isClassBound(entityClass)) {
             bindEntity(entityClass);
         }
     }

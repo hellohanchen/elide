@@ -5,6 +5,11 @@
  */
 package com.yahoo.elide.contrib.swagger;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.yahoo.elide.contrib.swagger.model.Resource;
 import com.yahoo.elide.contrib.swagger.models.Author;
 import com.yahoo.elide.contrib.swagger.models.Book;
@@ -14,9 +19,9 @@ import com.yahoo.elide.core.EntityDictionary;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
-import org.testng.Assert;
-import org.testng.annotations.BeforeSuite;
-import org.testng.annotations.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import io.swagger.converter.ModelConverters;
 import io.swagger.models.Model;
@@ -25,7 +30,7 @@ import io.swagger.models.properties.StringProperty;
 
 import java.util.Map;
 
-
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class JsonApiModelResolverTest {
 
     private static final String KEY_BOOK = "book";
@@ -39,7 +44,7 @@ public class JsonApiModelResolverTest {
 
     private ModelConverters converters;
 
-    @BeforeSuite
+    @BeforeAll
     public void setup() {
         EntityDictionary dictionary = new EntityDictionary(Maps.newHashMap());
 
@@ -58,16 +63,16 @@ public class JsonApiModelResolverTest {
         ObjectProperty relationships = getObjectProperty(KEY_BOOK, "relationships");
 
         String entityPermissions = entity.getDescription();
-        Assert.assertEquals(entityPermissions,
-            "Create Permissions : (Principal is author)\nDelete Permissions : (Deny All)");
+        assertEquals("Create Permissions : (Principal is author)\nDelete Permissions : (Deny All)",
+                entityPermissions);
 
         String titlePermissions = attributes.getProperties().get("title").getDescription();
-        Assert.assertEquals(titlePermissions,  "Read Permissions : (Principal is author OR Principal is publisher)");
+        assertEquals("Read Permissions : (Principal is author OR Principal is publisher)", titlePermissions);
 
         String publisherPermissions = relationships.getProperties().get("publisher").getDescription();
-        Assert.assertEquals(publisherPermissions,
-                "Read Permissions : (Principal is author OR Principal is publisher)\n"
-                        + "Update Permissions : (Principal is publisher)");
+        assertEquals("Read Permissions : (Principal is author OR Principal is publisher)\n"
+                + "Update Permissions : (Principal is publisher)",
+                publisherPermissions);
     }
 
     @Test
@@ -75,12 +80,12 @@ public class JsonApiModelResolverTest {
         ObjectProperty attributes = getObjectProperty(KEY_PUBLISHER, "attributes");
         ObjectProperty relationships = getObjectProperty(KEY_PUBLISHER, "relationships");
 
-        Assert.assertEquals(attributes.getProperties().size(), 3);
-        Assert.assertEquals(relationships.getProperties().size(), 2);
-        Assert.assertTrue(attributes.getProperties().containsKey("billingAddress"));
-        Assert.assertTrue(attributes.getProperties().containsKey("billingCodes"));
-        Assert.assertTrue(relationships.getProperties().containsKey("books"));
-        Assert.assertTrue(relationships.getProperties().containsKey("exclusiveAuthors"));
+        assertEquals(3, attributes.getProperties().size());
+        assertEquals(2, relationships.getProperties().size());
+        assertTrue(attributes.getProperties().containsKey("billingAddress"));
+        assertTrue(attributes.getProperties().containsKey("billingCodes"));
+        assertTrue(relationships.getProperties().containsKey("books"));
+        assertTrue(relationships.getProperties().containsKey("exclusiveAuthors"));
     }
 
     @Test
@@ -88,7 +93,7 @@ public class JsonApiModelResolverTest {
         ObjectProperty attributes = getObjectProperty(KEY_PUBLISHER, "attributes");
 
         String phoneDescription = attributes.getProperties().get("phone").getDescription();
-        Assert.assertEquals(phoneDescription,  "Phone number");
+        assertEquals("Phone number", phoneDescription);
     }
 
     @Test
@@ -96,7 +101,7 @@ public class JsonApiModelResolverTest {
         ObjectProperty attributes = getObjectProperty(KEY_AUTHOR, "attributes");
 
         Object nameDescription = attributes.getProperties().get("name").getDescription();
-        Assert.assertNull(nameDescription);
+        assertNull(nameDescription);
     }
 
     @Test
@@ -104,7 +109,7 @@ public class JsonApiModelResolverTest {
         ObjectProperty attributes = getObjectProperty(KEY_AUTHOR, "attributes");
 
         Object phoneDescription = attributes.getProperties().get("phone").getDescription();
-        Assert.assertNull(phoneDescription);
+        assertNull(phoneDescription);
     }
 
     @Test
@@ -112,7 +117,15 @@ public class JsonApiModelResolverTest {
         ObjectProperty attributes = getObjectProperty(KEY_PUBLISHER, "attributes");
 
         Object phoneExample = attributes.getProperties().get("phone").getExample();
-        Assert.assertEquals(phoneExample,  "555-000-1111");
+        assertEquals("555-000-1111", phoneExample);
+    }
+
+    @Test
+    public void testExampleRelationship() {
+        ObjectProperty attributes = getObjectProperty(KEY_BOOK, "relationships");
+
+        Object authorsExample = attributes.getProperties().get("authors").getExample();
+        assertEquals("[\"author1\", \"author2\", \"author3\"]", authorsExample);
     }
 
     @Test
@@ -120,7 +133,7 @@ public class JsonApiModelResolverTest {
         ObjectProperty attributes = getObjectProperty(KEY_AUTHOR, "attributes");
 
         Object nameExample = attributes.getProperties().get("name").getExample();
-        Assert.assertNull(nameExample);
+        assertNull(nameExample);
     }
 
     @Test
@@ -128,7 +141,7 @@ public class JsonApiModelResolverTest {
         ObjectProperty attributes = getObjectProperty(KEY_AUTHOR, "attributes");
 
         Object phoneExample = attributes.getProperties().get("phone").getExample();
-        Assert.assertNull(phoneExample);
+        assertNull(phoneExample);
     }
 
     @Test
@@ -136,8 +149,17 @@ public class JsonApiModelResolverTest {
         ObjectProperty attributes = getObjectProperty(KEY_BOOK, "attributes");
 
         String yearDescription = attributes.getProperties().get("year").getDescription();
-        Assert.assertEquals(yearDescription,
-            "Year published\nRead Permissions : (Principal is author OR Principal is publisher)");
+        assertEquals("Year published\nRead Permissions : (Principal is author OR Principal is publisher)",
+                yearDescription);
+    }
+
+    @Test
+    public void testConcatenatedDescriptionAndPermissionsRelationship() {
+        ObjectProperty attributes = getObjectProperty(KEY_BOOK, "relationships");
+
+        String authorsDescription = attributes.getProperties().get("authors").getDescription();
+        assertEquals("Writers\nRead Permissions : (Principal is author OR Principal is publisher)"
+                + "\nUpdate Permissions : (Principal is author)", authorsDescription);
     }
 
     @Test
@@ -145,7 +167,7 @@ public class JsonApiModelResolverTest {
         ObjectProperty attributes = getObjectProperty(KEY_BOOK, "attributes");
 
         boolean titleRequired = attributes.getProperties().get("title").getRequired();
-        Assert.assertTrue(titleRequired);
+        assertTrue(titleRequired);
     }
 
     @Test
@@ -153,7 +175,23 @@ public class JsonApiModelResolverTest {
         ObjectProperty attributes = getObjectProperty(KEY_BOOK, "attributes");
 
         Boolean titleReadOnly = attributes.getProperties().get("year").getReadOnly();
-        Assert.assertTrue(titleReadOnly);
+        assertTrue(titleReadOnly);
+    }
+
+    @Test
+    public void testRequiredRelationship() {
+        ObjectProperty attributes = getObjectProperty(KEY_BOOK, "relationships");
+
+        Boolean authorsRequired = attributes.getProperties().get("authors").getRequired();
+        assertFalse(authorsRequired);
+    }
+
+    @Test
+    public void testReadOnlyRelationship() {
+        ObjectProperty attributes = getObjectProperty(KEY_BOOK, "relationships");
+
+        Boolean authorsReadOnly = attributes.getProperties().get("authors").getReadOnly();
+        assertTrue(authorsReadOnly);
     }
 
     private Resource getModel(String entityKey) {

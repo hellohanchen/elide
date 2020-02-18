@@ -7,26 +7,39 @@ package com.yahoo.elide.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
+import com.yahoo.elide.Injector;
 import com.yahoo.elide.annotation.ComputedAttribute;
 import com.yahoo.elide.annotation.Exclude;
 import com.yahoo.elide.annotation.Include;
 import com.yahoo.elide.annotation.MappedInterface;
 import com.yahoo.elide.annotation.OnUpdatePreSecurity;
 import com.yahoo.elide.annotation.ReadPermission;
+import com.yahoo.elide.annotation.SecurityCheck;
+import com.yahoo.elide.core.exceptions.InvalidAttributeException;
 import com.yahoo.elide.functions.LifeCycleHook;
 import com.yahoo.elide.models.generics.Employee;
 import com.yahoo.elide.models.generics.Manager;
+import com.yahoo.elide.security.checks.UserCheck;
 import com.yahoo.elide.security.checks.prefab.Collections.AppendOnly;
 import com.yahoo.elide.security.checks.prefab.Collections.RemoveOnly;
 import com.yahoo.elide.security.checks.prefab.Common.UpdateOnCreate;
 import com.yahoo.elide.security.checks.prefab.Role;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+
+import example.Author;
+import example.Book;
 import example.Child;
+import example.Editor;
 import example.FieldAnnotations;
 import example.FunWithPermissions;
 import example.Job;
@@ -35,15 +48,19 @@ import example.Parent;
 import example.Right;
 import example.StringId;
 import example.User;
+
 import org.junit.jupiter.api.Test;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+
 import javax.persistence.AccessType;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -57,23 +74,24 @@ public class EntityDictionaryTest extends EntityDictionary {
     private class Friend extends Child { }
 
     public EntityDictionaryTest() {
-        super(Collections.EMPTY_MAP);
+        super(Collections.EMPTY_MAP, mock(Injector.class));
         init();
     }
 
     private void init() {
-        this.bindEntity(FunWithPermissions.class);
-        this.bindEntity(Parent.class);
-        this.bindEntity(Child.class);
-        this.bindEntity(User.class);
-        this.bindEntity(Left.class);
-        this.bindEntity(Right.class);
-        this.bindEntity(StringId.class);
-        this.bindEntity(Friend.class);
-        this.bindEntity(FieldAnnotations.class);
-        this.bindEntity(Manager.class);
-        this.bindEntity(Employee.class);
-        this.bindEntity(Job.class);
+        bindEntity(FunWithPermissions.class);
+        bindEntity(Parent.class);
+        bindEntity(Child.class);
+        bindEntity(User.class);
+        bindEntity(Left.class);
+        bindEntity(Right.class);
+        bindEntity(StringId.class);
+        bindEntity(Friend.class);
+        bindEntity(FieldAnnotations.class);
+        bindEntity(Manager.class);
+        bindEntity(Employee.class);
+        bindEntity(Job.class);
+        bindEntity(NoId.class);
 
         checkNames.forcePut("user has all access", Role.ALL.class);
     }
@@ -88,11 +106,29 @@ public class EntityDictionaryTest extends EntityDictionary {
     }
 
     @Test
+    public void testCheckScan() {
+
+        @SecurityCheck("User is Admin")
+        class Foo extends UserCheck {
+
+            @Override
+            public boolean ok(com.yahoo.elide.security.User user) {
+                return false;
+            }
+        }
+
+        EntityDictionary testDictionary = new EntityDictionary(new HashMap<>());
+        testDictionary.scanForSecurityChecks();
+
+        assertEquals("User is Admin", testDictionary.getCheckIdentifier(Foo.class));
+    }
+
+    @Test
     public void testGetAttributeOrRelationAnnotation() {
-        String[] fields = {"field1", "field2", "field3", "relation1", "relation2"};
+        String[] fields = { "field1", "field2", "field3", "relation1", "relation2" };
         Annotation annotation;
         for (String field : fields) {
-            annotation = this.getAttributeOrRelationAnnotation(FunWithPermissions.class, ReadPermission.class, field);
+            annotation = getAttributeOrRelationAnnotation(FunWithPermissions.class, ReadPermission.class, field);
             assertTrue(annotation instanceof ReadPermission, "Every field should return a ReadPermission annotation");
         }
     }
@@ -109,9 +145,14 @@ public class EntityDictionaryTest extends EntityDictionary {
         }
 
         Initializer<Foo> initializer = mock(Initializer.class);
-        this.bindInitializer(initializer, Foo.class);
+        bindInitializer(initializer, Foo.class);
 
-        assertEquals(1, this.getAllFields(Foo.class).size());
+        assertEquals(1, getAllFields(Foo.class).size());
+
+        Foo foo = new Foo();
+        initializeEntity(foo);
+
+        verify(initializer).initialize(foo);
     }
 
     @Test
@@ -127,9 +168,9 @@ public class EntityDictionaryTest extends EntityDictionary {
 
         LifeCycleHook<Foo2> trigger = mock(LifeCycleHook.class);
 
-        this.bindTrigger(Foo2.class, OnUpdatePreSecurity.class, "bar", trigger);
-            assertEquals(1, this.getAllFields(Foo2.class).size());
-        }
+        bindTrigger(Foo2.class, OnUpdatePreSecurity.class, "bar", trigger);
+        assertEquals(1, getAllFields(Foo2.class).size());
+    }
 
     @Test
     public void testBindingTriggerPriorToBindingEntityClass2() {
@@ -144,8 +185,8 @@ public class EntityDictionaryTest extends EntityDictionary {
 
         LifeCycleHook<Foo3> trigger = mock(LifeCycleHook.class);
 
-        this.bindTrigger(Foo3.class, OnUpdatePreSecurity.class, trigger, true);
-        assertEquals(1, this.getAllFields(Foo3.class).size());
+        bindTrigger(Foo3.class, OnUpdatePreSecurity.class, trigger, true);
+        assertEquals(1, getAllFields(Foo3.class).size());
     }
 
     @Test
@@ -161,8 +202,8 @@ public class EntityDictionaryTest extends EntityDictionary {
 
         LifeCycleHook<Foo4> trigger = mock(LifeCycleHook.class);
 
-        this.bindTrigger(Foo4.class, OnUpdatePreSecurity.class, trigger);
-        assertEquals(1, this.getAllFields(Foo4.class).size());
+        bindTrigger(Foo4.class, OnUpdatePreSecurity.class, trigger);
+        assertEquals(1, getAllFields(Foo4.class).size());
     }
 
     @Test
@@ -189,14 +230,14 @@ public class EntityDictionaryTest extends EntityDictionary {
             }
 
             public void setComputedProperty() {
-                //NOOP
+                // NOOP
             }
         }
-        this.bindEntity(FieldLevelTest.class);
+        bindEntity(FieldLevelTest.class);
 
         assertEquals(AccessType.FIELD, getAccessType(FieldLevelTest.class));
 
-        List<String> fields = this.getAllFields(FieldLevelTest.class);
+        List<String> fields = getAllFields(FieldLevelTest.class);
         assertEquals(3, fields.size());
         assertTrue(fields.contains("bar"));
         assertTrue(fields.contains("computedField"));
@@ -237,11 +278,11 @@ public class EntityDictionaryTest extends EntityDictionary {
                 //NOOP
             }
         }
-        this.bindEntity(PropertyLevelTest.class);
+        bindEntity(PropertyLevelTest.class);
 
         assertEquals(AccessType.PROPERTY, getAccessType(PropertyLevelTest.class));
 
-        List<String> fields = this.getAllFields(PropertyLevelTest.class);
+        List<String> fields = getAllFields(PropertyLevelTest.class);
         assertEquals(2, fields.size());
         assertTrue(fields.contains("bar"));
         assertTrue(fields.contains("computedProperty"));
@@ -268,7 +309,7 @@ public class EntityDictionaryTest extends EntityDictionary {
         assertEquals(
                 Child.class,
                 getParameterizedType(Parent.class, "children"),
-            "getParameterizedType returns the type of relationship fields");
+                "getParameterizedType returns the type of relationship fields");
 
         assertEquals(
                 Employee.class,
@@ -277,7 +318,7 @@ public class EntityDictionaryTest extends EntityDictionary {
     }
 
     @Test
-    public void testGetInverseRelationshipOwningSide()  {
+    public void testGetInverseRelationshipOwningSide() {
         assertEquals(
                 "parents",
                 getRelationInverse(Parent.class, "children"),
@@ -285,7 +326,7 @@ public class EntityDictionaryTest extends EntityDictionary {
     }
 
     @Test
-    public void testGetInverseRelationshipOwnedSide()  {
+    public void testGetInverseRelationshipOwnedSide() {
         assertEquals(
                 "children",
                 getRelationInverse(Child.class, "parents"),
@@ -316,10 +357,10 @@ public class EntityDictionaryTest extends EntityDictionary {
     @Test
     public void testGetIdAnnotations() throws Exception {
 
-        Collection<Class> expectedAnnotationClasses = Arrays.asList(new Class[]{Id.class, GeneratedValue.class});
-        Collection<Class> actualAnnotationsClasses  = getIdAnnotations(new Parent()).stream()
-            .map(Annotation::annotationType)
-        .collect(Collectors.toList());
+        Collection<Class> expectedAnnotationClasses = Arrays.asList(new Class[] { Id.class, GeneratedValue.class });
+        Collection<Class> actualAnnotationsClasses = getIdAnnotations(new Parent()).stream()
+                .map(Annotation::annotationType)
+                .collect(Collectors.toList());
 
         assertEquals(actualAnnotationsClasses, expectedAnnotationClasses,
                 "getIdAnnotations returns annotations on the ID field of the given class");
@@ -329,13 +370,13 @@ public class EntityDictionaryTest extends EntityDictionary {
     public void testGetIdAnnotationsNoId() throws Exception {
 
         Collection<Annotation> expectedAnnotation = Collections.emptyList();
-        Collection<Annotation> actualAnnotations  = getIdAnnotations(new NoId());
+        Collection<Annotation> actualAnnotations = getIdAnnotations(new NoId());
 
         assertEquals(actualAnnotations, expectedAnnotation,
                 "getIdAnnotations returns an empty collection if there is no ID field for given class");
     }
 
-    @Entity
+    @Include
     class NoId {
 
     }
@@ -343,10 +384,10 @@ public class EntityDictionaryTest extends EntityDictionary {
     @Test
     public void testGetIdAnnotationsSubClass() throws Exception {
 
-        Collection<Class> expectedAnnotationClasses = Arrays.asList(new Class[]{Id.class, GeneratedValue.class});
-        Collection<Class> actualAnnotationsClasses  = getIdAnnotations(new Friend()).stream()
+        Collection<Class> expectedAnnotationClasses = Arrays.asList(new Class[] { Id.class, GeneratedValue.class });
+        Collection<Class> actualAnnotationsClasses = getIdAnnotations(new Friend()).stream()
                 .map(Annotation::annotationType)
-        .collect(Collectors.toList());
+                .collect(Collectors.toList());
 
         assertEquals(actualAnnotationsClasses, expectedAnnotationClasses,
                 "getIdAnnotations returns annotations on the ID field when defined in a super class");
@@ -417,10 +458,10 @@ public class EntityDictionaryTest extends EntityDictionary {
                 "getType returns the type of attribute when defined in a super class");
 
         assertEquals(Manager.class, getType(Employee.class, "boss"),
-            "getType returns the correct generic type of a to-one relationship");
+                "getType returns the correct generic type of a to-one relationship");
 
         assertEquals(Set.class, getType(Manager.class, "minions"),
-            "getType returns the correct generic type of a to-many relationship");
+                "getType returns the correct generic type of a to-many relationship");
 
         // ID is "id"
         assertEquals(long.class, getType(Parent.class, "id"),
@@ -468,7 +509,7 @@ public class EntityDictionaryTest extends EntityDictionary {
     }
 
     @Test
-    public void testChildBinding() {
+    public void testEntityInheritanceBinding() {
         @Entity
         @Include
         class SuperclassBinding {
@@ -482,20 +523,276 @@ public class EntityDictionaryTest extends EntityDictionary {
         class SubsubclassBinding extends SubclassBinding {
         }
 
-        this.bindEntity(SuperclassBinding.class);
+        bindEntity(SuperclassBinding.class);
+        bindEntity(SubclassBinding.class);
+        bindEntity(SubsubclassBinding.class);
 
-        assertEquals(SuperclassBinding.class, getEntityBinding(SubclassBinding.class).entityClass);
-        // repeat
-        assertEquals(SuperclassBinding.class, getEntityBinding(SubclassBinding.class).entityClass);
+        assertEquals(SubclassBinding.class, getEntityBinding(SubclassBinding.class).entityClass);
+        assertEquals(SuperclassBinding.class, getEntityBinding(SuperclassBinding.class).entityClass);
 
         assertEquals(SuperclassBinding.class, lookupEntityClass(SuperclassBinding.class));
         assertEquals(SuperclassBinding.class, lookupEntityClass(SubclassBinding.class));
         assertEquals(SuperclassBinding.class, lookupEntityClass(SubsubclassBinding.class));
+
+        assertEquals("subclassBinding", getEntityFor(SubclassBinding.class));
+        assertEquals("superclassBinding", getEntityFor(SuperclassBinding.class));
+
+        assertEquals(SubclassBinding.class, getEntityClass("subclassBinding"));
+        assertEquals(SuperclassBinding.class, getEntityClass("superclassBinding"));
+
+        assertEquals("subclassBinding", getJsonAliasFor(SubclassBinding.class));
+        assertEquals("superclassBinding", getJsonAliasFor(SuperclassBinding.class));
+    }
+
+    @Test
+    public void testEntityInheritanceBindingOverride() {
+        @Entity
+        @Include
+        class SuperclassBinding {
+            @Id
+            private long id;
+        }
+
+        class SubclassBinding extends SuperclassBinding {
+        }
+
+        @Entity
+        @Include
+        class SubsubclassBinding extends SubclassBinding {
+            @Id
+            private long id;
+        }
+
+        bindEntity(SuperclassBinding.class);
+        bindEntity(SubclassBinding.class);
+        bindEntity(SubsubclassBinding.class);
+
+        assertEquals(SuperclassBinding.class, getEntityBinding(SuperclassBinding.class).entityClass);
+        assertEquals(SubclassBinding.class, getEntityBinding(SubclassBinding.class).entityClass);
+        assertEquals(SubsubclassBinding.class, getEntityBinding(SubsubclassBinding.class).entityClass);
+
+        assertEquals(SuperclassBinding.class, lookupEntityClass(SuperclassBinding.class));
+        assertEquals(SuperclassBinding.class, lookupEntityClass(SubclassBinding.class));
+        assertEquals(SubsubclassBinding.class, lookupEntityClass(SubsubclassBinding.class));
+    }
+
+    @Test
+    public void testMissingEntityBinding() {
+        @Entity
+        class SuperclassBinding {
+            @Id
+            private long id;
+        }
+
+        bindEntity(SuperclassBinding.class);
+
+        assertEquals(null, getEntityBinding(SuperclassBinding.class).entityClass);
+        assertEquals(SuperclassBinding.class, lookupEntityClass(SuperclassBinding.class));
+    }
+
+    @Test
+    public void testNonEntityInheritanceBinding() {
+        @Include
+        class SuperclassBinding {
+            @Id
+            private long id;
+        }
+
+        class SubclassBinding extends SuperclassBinding {
+        }
+
+        class SubsubclassBinding extends SubclassBinding {
+        }
+
+        bindEntity(SuperclassBinding.class);
+        bindEntity(SubclassBinding.class);
+        bindEntity(SubsubclassBinding.class);
+
+        assertEquals(SubclassBinding.class, getEntityBinding(SubclassBinding.class).entityClass);
+        assertEquals(SuperclassBinding.class, getEntityBinding(SuperclassBinding.class).entityClass);
+
+        assertEquals(SuperclassBinding.class, lookupIncludeClass(SuperclassBinding.class));
+        assertEquals(SubclassBinding.class, lookupIncludeClass(SubclassBinding.class));
+        assertEquals(SubsubclassBinding.class, lookupIncludeClass(SubsubclassBinding.class));
+    }
+
+    @Test
+    public void testNonEntityInheritanceBindingOverride() {
+        @Include
+        class SuperclassBinding {
+            @Id
+            private long id;
+        }
+
+        class SubclassBinding extends SuperclassBinding {
+        }
+
+        @Include
+        class SubsubclassBinding extends SubclassBinding {
+            @Id
+            private long id;
+        }
+
+        bindEntity(SuperclassBinding.class);
+        bindEntity(SubclassBinding.class);
+        bindEntity(SubsubclassBinding.class);
+
+        assertEquals(SubclassBinding.class, getEntityBinding(SubclassBinding.class).entityClass);
+        assertEquals(SuperclassBinding.class, getEntityBinding(SuperclassBinding.class).entityClass);
+        assertEquals(SubsubclassBinding.class, getEntityBinding(SubsubclassBinding.class).entityClass);
+
+        assertEquals(SuperclassBinding.class, lookupIncludeClass(SuperclassBinding.class));
+        assertEquals(SubclassBinding.class, lookupIncludeClass(SubclassBinding.class));
+        assertEquals(SubsubclassBinding.class, lookupIncludeClass(SubsubclassBinding.class));
+    }
+
+    @Test
+    public void testNonEntityInheritanceBindingExclusion() {
+        @Include
+        class SuperclassBinding {
+            @Id
+            private long id;
+        }
+
+        class SubclassBinding extends SuperclassBinding {
+        }
+
+        @Exclude
+        class SubsubclassBinding extends SubclassBinding {
+        }
+
+        bindEntity(SuperclassBinding.class);
+        bindEntity(SubclassBinding.class);
+        bindEntity(SubsubclassBinding.class);
+
+        assertEquals(SubclassBinding.class, getEntityBinding(SubclassBinding.class).entityClass);
+        assertEquals(SuperclassBinding.class, getEntityBinding(SuperclassBinding.class).entityClass);
+        assertThrows(IllegalArgumentException.class, () -> {
+            getEntityBinding(SubsubclassBinding.class);
+        });
+
+        assertEquals(SuperclassBinding.class, lookupIncludeClass(SuperclassBinding.class));
+        assertEquals(SubclassBinding.class, lookupIncludeClass(SubclassBinding.class));
+        assertEquals(null, lookupIncludeClass(SubsubclassBinding.class));
+    }
+
+    @Test
+    public void testGetFirstAnnotation() {
+        @Exclude
+        class Foo { }
+
+        @Include
+        class Bar extends Foo {
+
+        }
+
+        class Baz extends Bar {
+
+        }
+
+        Annotation first = getFirstAnnotation(Baz.class, Arrays.asList(Exclude.class, Include.class));
+        assertTrue(first instanceof Include);
+    }
+
+    @Test
+    public void testGetFirstAnnotationConflict() {
+        @Exclude
+        @Include
+        class Foo { }
+
+        Annotation first = getFirstAnnotation(Foo.class, Arrays.asList(Exclude.class, Include.class));
+        assertTrue(first instanceof Exclude);
     }
 
     @Test
     public void testBadLookupEntityClass() {
         assertThrows(IllegalArgumentException.class, () -> lookupEntityClass(null));
         assertThrows(IllegalArgumentException.class, () -> lookupEntityClass(Object.class));
+    }
+
+    @Test
+    public void testFieldLookup() throws Exception {
+        bindEntity(Book.class);
+        bindEntity(Editor.class);
+        bindEntity(Author.class);
+
+        Book book = new Book() {
+            @Override
+            public String toString() {
+                return "ProxyBook";
+            }
+        };
+        book.setId(1234L);
+        Author author = new Author();
+
+        initializeEntity(book);
+
+        RequestScope scope = mock(RequestScope.class);
+
+        assertEquals("Book", getSimpleName(Book.class));
+        assertEquals("getEditor",
+                findMethod(Book.class, "getEditor").getName());
+        assertEquals("setGenre",
+                findMethod(Book.class, "setGenre", String.class).getName());
+
+        setValue(book, "genre", "Elide");
+        assertEquals("Elide", getValue(book, "genre", scope));
+        setValue(book, "authors", ImmutableSet.of(author));
+        assertEquals(ImmutableSet.of(author), getValue(book, "authors", scope));
+
+        assertThrows(InvalidAttributeException.class, () -> setValue(book, "badfield", "Elide"));
+        assertEquals("1234", getId(book));
+        assertEquals(true, isRoot(Book.class));
+
+        assertEquals(Book.class, lookupBoundClass(Book.class));
+        assertNull(lookupBoundClass(String.class));
+        // check proxy lookup
+        assertNotEquals(Book.class, book.getClass());
+        assertEquals(Book.class, lookupBoundClass(book.getClass()));
+
+        assertFalse(isComputed(Book.class, "genre"));
+        assertTrue(isComputed(Book.class, "editor"));
+        assertTrue(isComputed(Editor.class, "fullName"));
+        assertFalse(isComputed(Editor.class, "badfield"));
+
+        assertEquals(
+                ImmutableSet.of("genre", "language", "title"),
+                getFieldsOfType(Book.class, String.class));
+
+        assertTrue(isRelation(Book.class, "editor"));
+        assertTrue(isAttribute(Book.class, "title"));
+        assertEquals(
+                Arrays.asList(Book.class, Author.class, Editor.class),
+                walkEntityGraph(ImmutableSet.of(Book.class), x -> x));
+
+        assertTrue(hasBinding(Book.class));
+        assertFalse(hasBinding(String.class));
+    }
+
+    @Test
+    public void testCoerce() throws Exception {
+        @Entity
+        @Include
+        class CoerceBean {
+            public String string;
+            public List<Boolean> list;
+            public Map<String, Long> map;
+            public Set<Double> set;
+        }
+
+        bindEntity(CoerceBean.class);
+        CoerceBean bean = new CoerceBean();
+
+        setValue(bean, "string", 1L);
+        setValue(bean, "list", ImmutableSet.of(true, false));
+        setValue(bean, "map", ImmutableMap.of("one", "1", "two", "2"));
+        setValue(bean, "set", ImmutableList.of(3L, 4L));
+
+        assertEquals("1", bean.string);
+        assertEquals(Arrays.asList(true, false), bean.list);
+        assertEquals(
+                ImmutableMap.of("one", 1L, "two", 2L),
+                bean.map);
+        assertEquals(ImmutableSet.of(3.0, 4.0), bean.set);
     }
 }

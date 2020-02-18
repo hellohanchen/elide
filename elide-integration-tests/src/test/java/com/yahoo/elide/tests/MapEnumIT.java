@@ -5,7 +5,14 @@
  */
 package com.yahoo.elide.tests;
 
-import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.*;
+import static com.yahoo.elide.Elide.JSONAPI_CONTENT_TYPE;
+import static com.yahoo.elide.Elide.JSONAPI_CONTENT_TYPE_WITH_JSON_PATCH_EXTENSION;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.attr;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.attributes;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.datum;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.id;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.resource;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.type;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 
@@ -37,8 +44,8 @@ class MapEnumIT extends IntegrationTest {
                 )
         );
         given()
-                .contentType("application/vnd.api+json")
-                .accept("application/vnd.api+json")
+                .contentType(JSONAPI_CONTENT_TYPE)
+                .accept(JSONAPI_CONTENT_TYPE)
                 .body(datum(resource))
                 .post("/mapColorShape")
                 .then()
@@ -50,14 +57,14 @@ class MapEnumIT extends IntegrationTest {
 
         // Update MapColorShape using Patch
         given()
-                .contentType("application/vnd.api+json")
-                .accept("application/vnd.api+json")
+                .contentType(JSONAPI_CONTENT_TYPE)
+                .accept(JSONAPI_CONTENT_TYPE)
                 .body(datum(resource))
                 .patch("/mapColorShape/1")
                 .then().statusCode(HttpStatus.SC_NO_CONTENT);
 
         given()
-                .accept("application/vnd.api+json")
+                .accept(JSONAPI_CONTENT_TYPE)
                 .get("/mapColorShape/1")
                 .then()
                 .statusCode(HttpStatus.SC_OK)
@@ -79,8 +86,8 @@ class MapEnumIT extends IntegrationTest {
         );
         // Create MapColorShape using Patch extension
         given()
-                .contentType("application/vnd.api+json; ext=jsonpatch")
-                .accept("application/vnd.api+json; ext=jsonpatch")
+                .contentType(JSONAPI_CONTENT_TYPE_WITH_JSON_PATCH_EXTENSION)
+                .accept(JSONAPI_CONTENT_TYPE_WITH_JSON_PATCH_EXTENSION)
                 .body("[\n"
                         + "{\n"
                         + "  \"op\": \"add\",\n"
@@ -101,7 +108,7 @@ class MapEnumIT extends IntegrationTest {
                 .statusCode(HttpStatus.SC_OK);
 
         given()
-                .accept("application/vnd.api+json")
+                .accept(JSONAPI_CONTENT_TYPE)
                 .get("/mapColorShape/1")
                 .then()
                 .statusCode(HttpStatus.SC_OK)

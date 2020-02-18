@@ -5,31 +5,29 @@
  */
 package com.yahoo.elide.standalone;
 
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.attr;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.attributes;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.datum;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.id;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.resource;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.type;
+import static com.yahoo.elide.Elide.JSONAPI_CONTENT_TYPE;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.hasKey;
-import io.swagger.models.Info;
-import io.swagger.models.Swagger;
-
-import com.yahoo.elide.ElideSettings;
-import com.yahoo.elide.ElideSettingsBuilder;
-import com.yahoo.elide.contrib.swagger.SwaggerBuilder;
-import com.yahoo.elide.core.DataStore;
-import com.yahoo.elide.core.EntityDictionary;
-import com.yahoo.elide.core.filter.dialect.RSQLFilterDialect;
-import com.yahoo.elide.datastores.jpa.JpaDataStore;
-import com.yahoo.elide.datastores.jpa.transaction.NonJtaTransaction;
-import com.yahoo.elide.standalone.config.ElideStandaloneSettings;
-import com.yahoo.elide.standalone.models.Post;
 
 import com.google.common.collect.Maps;
+import com.yahoo.elide.contrib.swagger.SwaggerBuilder;
+import com.yahoo.elide.core.EntityDictionary;
+import com.yahoo.elide.standalone.config.ElideStandaloneSettings;
+import com.yahoo.elide.standalone.models.Post;
+import io.swagger.models.Info;
+import io.swagger.models.Swagger;
 import org.apache.http.HttpStatus;
-import org.glassfish.hk2.api.ServiceLocator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
-import javax.persistence.EntityManagerFactory;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -41,16 +39,12 @@ import java.util.Properties;
 public class ElideStandaloneTest {
     private ElideStandalone elide;
 
-    private static final String JSONAPI_CONTENT_TYPE = "application/vnd.api+json";
-
     @BeforeAll
     public void init() throws Exception {
         elide = new ElideStandalone(new ElideStandaloneSettings() {
 
             @Override
-            public ElideSettings getElideSettings(ServiceLocator injector) {
-                EntityDictionary dictionary = new EntityDictionary(getCheckMappings());
-
+            public Properties getDatabaseProperties() {
                 Properties options = new Properties();
 
                 options.put("hibernate.show_sql", "true");
@@ -63,21 +57,12 @@ public class ElideStandaloneTest {
                 options.put("javax.persistence.jdbc.url", "jdbc:h2:mem:db1;DB_CLOSE_DELAY=-1;MVCC=TRUE;");
                 options.put("javax.persistence.jdbc.user", "sa");
                 options.put("javax.persistence.jdbc.password", "");
+                return options;
+            }
 
-                EntityManagerFactory entityManagerFactory = Util.getEntityManagerFactory(Post.class.getPackage().getName(), options);
-                DataStore dataStore = new JpaDataStore(
-                        () -> { return entityManagerFactory.createEntityManager(); },
-                        (em -> { return new NonJtaTransaction(em); }));
-
-                dataStore.populateEntityDictionary(dictionary);
-
-                ElideSettingsBuilder builder = new ElideSettingsBuilder(dataStore)
-                        .withUseFilterExpressions(true)
-                        .withEntityDictionary(dictionary)
-                        .withJoinFilterDialect(new RSQLFilterDialect(dictionary))
-                        .withSubqueryFilterDialect(new RSQLFilterDialect(dictionary));
-
-                return builder.build();
+            @Override
+            public String getModelPackageName() {
+                return Post.class.getPackage().getName();
             }
 
             @Override
@@ -106,22 +91,48 @@ public class ElideStandaloneTest {
 
     @Test
     public void testJsonAPIPost() {
-        String result = given()
+        given()
             .contentType(JSONAPI_CONTENT_TYPE)
             .accept(JSONAPI_CONTENT_TYPE)
-            .body("{\n" +
-                  "         \"data\": {\n" +
-                  "           \"type\": \"post\",\n" +
-                  "           \"id\": \"1\",\n" +
-                  "           \"attributes\": {\n" +
-                  "             \"content\": \"This is my first post. woot.\",\n" +
-                  "             \"date\" : \"0\"\n" +
-                  "           }\n" +
-                  "         }\n" +
-                  "       }")
+            .body(
+                datum(
+                    resource(
+                        type("post"),
+                        id("1"),
+                        attributes(
+                            attr("content", "This is my first post. woot."),
+                            attr("date", "2019-01-01T00:00Z")
+                        )
+                    )
+                )
+            )
             .post("/api/v1/post")
             .then()
             .statusCode(HttpStatus.SC_CREATED)
+            .extract().body().asString();
+    }
+
+    @Test
+    public void testForbiddenJsonAPIPost() {
+        given()
+            .contentType(JSONAPI_CONTENT_TYPE)
+            .accept(JSONAPI_CONTENT_TYPE)
+            .body(
+                datum(
+                    resource(
+                        type("post"),
+                        id("2"),
+                        attributes(
+                            attr("content", "This is my first post. woot."),
+                            attr("date", "2019-01-01T00:00Z"),
+                            attr("abusiveContent", true)
+                        )
+                    )
+                )
+            )
+            .post("/api/v1/post")
+            .then()
+            .statusCode(HttpStatus.SC_FORBIDDEN)
             .extract().body().asString();
     }
 

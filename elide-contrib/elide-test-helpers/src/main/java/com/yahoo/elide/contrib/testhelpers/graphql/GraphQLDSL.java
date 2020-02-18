@@ -390,16 +390,11 @@ public final class GraphQLDSL {
      * @see <a href="https://graphql.org/learn/schema/#object-types-and-fields">Object Types and Fields</a>
      */
     public static Selection field(String name, SelectionSet... selectionSet) {
-        List<SelectionSet> ss = Arrays.stream(selectionSet)
-                .map(i -> (SelectionSet) i)
-                .collect(Collectors.toList());
-        return new Field(null, name, Arguments.emptyArgument(), relayWrap(ss));
+        return field(null, name, selectionSet);
     }
 
     public static Selection field(String alias, String name, SelectionSet... selectionSet) {
-        List<SelectionSet> ss = Arrays.stream(selectionSet)
-                .map(i -> (SelectionSet) i)
-                .collect(Collectors.toList());
+        List<SelectionSet> ss = ImmutableList.copyOf(selectionSet);
         return new Field(alias, name, Arguments.emptyArgument(), relayWrap(ss));
     }
 
@@ -492,22 +487,21 @@ public final class GraphQLDSL {
         if (value instanceof String) {
             value = quoted ? String.format("\"%s\"", value) : value;
             return new Argument(name, value);
-        } else {
-            // this is an object which needs to be Jackson-serialized
-            try {
-                return new Argument(
-                        name,
-                        BASE_MAPPER
-                                .configure(
-                                        // GraphQL argument name is unquoted; hence quoted field is disabled.
-                                        JsonGenerator.Feature.QUOTE_FIELD_NAMES,
-                                        false
-                                )
-                                .writeValueAsString(value)
-                );
-            } catch (JsonProcessingException exception) {
-                throw new IllegalStateException(String.format("Cannot serialize %s", value), exception);
-            }
+        }
+        // this is an object which needs to be Jackson-serialized
+        try {
+            return new Argument(
+                    name,
+                    BASE_MAPPER
+                            .configure(
+                                    // GraphQL argument name is unquoted; hence quoted field is disabled.
+                                    JsonGenerator.Feature.QUOTE_FIELD_NAMES,
+                                    false
+                            )
+                            .writeValueAsString(value)
+            );
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException(String.format("Cannot serialize %s", value), exception);
         }
     }
 

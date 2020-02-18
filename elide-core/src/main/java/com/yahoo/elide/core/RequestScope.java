@@ -221,7 +221,7 @@ public class RequestScope implements com.yahoo.elide.security.RequestScope {
 
     @Override
     public Set<com.yahoo.elide.security.PersistentResource> getNewResources() {
-        return (Set<com.yahoo.elide.security.PersistentResource>) (Set<?>) newPersistentResources;
+        return (Set) newPersistentResources;
     }
 
     public boolean isNewResource(Object entity) {
@@ -272,7 +272,7 @@ public class RequestScope implements com.yahoo.elide.security.RequestScope {
     public Optional<FilterExpression> getLoadFilterExpression(Class<?> loadClass) {
         Optional<FilterExpression> permissionFilter;
         permissionFilter = getPermissionExecutor().getReadPermissionFilter(loadClass);
-        Optional<FilterExpression> globalFilterExpressionOptional = null;
+        Optional<FilterExpression> globalFilterExpressionOptional;
         if (globalFilterExpression == null) {
             String typeName = dictionary.getJsonAliasFor(loadClass);
             globalFilterExpressionOptional =  getFilterExpressionByType(typeName);

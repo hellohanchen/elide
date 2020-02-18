@@ -5,7 +5,20 @@
  */
 package com.yahoo.elide.tests;
 
-import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.*;
+import static com.yahoo.elide.Elide.JSONAPI_CONTENT_TYPE;
+import static com.yahoo.elide.Elide.JSONAPI_CONTENT_TYPE_WITH_JSON_PATCH_EXTENSION;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.attr;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.attributes;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.data;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.datum;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.document;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.id;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.include;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.linkage;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.relation;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.relationships;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.resource;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.type;
 import static com.yahoo.elide.contrib.testhelpers.jsonapi.elements.Relation.TO_ONE;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.anyOf;
@@ -73,9 +86,6 @@ import javax.ws.rs.core.Response.Status;
  * The type Config resource test.
  */
 public class ResourceIT extends IntegrationTest {
-    private static final String JSONAPI_CONTENT_TYPE = "application/vnd.api+json";
-    private static final String JSONAPI_CONTENT_TYPE_WITH_JSON_PATCH_EXTENSION =
-            "application/vnd.api+json; ext=jsonpatch";
     private final JsonParser jsonParser = new JsonParser();
 
     private static final Resource PARENT1 = resource(
@@ -530,7 +540,8 @@ public class ResourceIT extends IntegrationTest {
 
     @Test
     public void testSubCollectionRelationships() throws Exception {
-        given().when().get("/parent/1/children/1/relationships/parents").then().statusCode(HttpStatus.SC_OK)
+        given().when().get("/parent/1/children/1/relationships/parents").then()
+                .statusCode(HttpStatus.SC_OK)
                 .body(equalTo(
                         data(linkage(type("parent"), id("1"))).toJSON()));
     }
@@ -2160,7 +2171,6 @@ public class ResourceIT extends IntegrationTest {
                 .body(req)
                 .patch("/parent")
                 .then()
-                .log().all()
                 .statusCode(HttpStatus.SC_OK)
                 .body(equalTo(expected));
     }

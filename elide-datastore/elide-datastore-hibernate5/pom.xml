@@ -14,7 +14,7 @@
     <parent>
         <groupId>com.yahoo.elide</groupId>
         <artifactId>elide-datastore-parent-pom</artifactId>
-        <version>4.5.3-SNAPSHOT</version>
+        <version>4.5.14-SNAPSHOT</version>
     </parent>
 
     <licenses>
@@ -37,6 +37,10 @@
         <url>https://github.com/yahoo/elide.git</url>
         <tag>HEAD</tag>
     </scm>
+    <properties>
+        <excludeTags>emptyOnAttributeCollection</excludeTags>
+    </properties>
+
 
     <dependencies>
         <!-- Elide (including integration tests) -->
@@ -47,19 +51,19 @@
         <dependency>
             <groupId>com.yahoo.elide</groupId>
             <artifactId>elide-datastore-hibernate</artifactId>
-            <version>4.5.3-SNAPSHOT</version>
+            <version>4.5.14-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.yahoo.elide</groupId>
             <artifactId>elide-datastore-hibernate</artifactId>
-            <version>4.5.3-SNAPSHOT</version>
+            <version>4.5.14-SNAPSHOT</version>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.yahoo.elide</groupId>
             <artifactId>elide-integration-tests</artifactId>
-            <version>4.5.3-SNAPSHOT</version>
+            <version>4.5.14-SNAPSHOT</version>
             <type>test-jar</type>
             <scope>test</scope>
     	</dependency>
@@ -157,7 +161,7 @@
         </dependency>
 
         <dependency>
-            <groupId>com.jayway.restassured</groupId>
+            <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
         </dependency>
@@ -226,7 +230,7 @@
                         </goals>
                         <configuration>
                             <systemPropertyVariables>
-                                <dataStoreHarness>com.yahoo.elide.datastores.hibernate5.HibernateDataStoreHarness</dataStoreHarness>
+                                <dataStoreHarness>com.yahoo.elide.datastores.hibernate5.HibernateEntityManagerDataStoreHarness</dataStoreHarness>
                             </systemPropertyVariables>
                         </configuration>
                     </execution>
@@ -239,10 +243,11 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <forkMode>once</forkMode>
-                    <reuseForks>false</reuseForks>
+                    <forkCount>1</forkCount>
+                    <reuseForks>true</reuseForks>
                     <trimStackTrace>false</trimStackTrace>
                     <failIfNoTests>true</failIfNoTests>
+                    <excludedGroups>${excludeTags}</excludedGroups>
                 </configuration>
             </plugin>
             <plugin>

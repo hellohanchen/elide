@@ -14,7 +14,7 @@ import static graphql.schema.GraphQLObjectType.newObject;
 import com.yahoo.elide.core.EntityDictionary;
 import com.yahoo.elide.core.RelationshipType;
 
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 
 import graphql.Scalars;
 import graphql.schema.DataFetcher;
@@ -109,7 +109,7 @@ public class ModelBuilder {
                 .build();
 
         pageInfoObject = newObject()
-                .name("__pageInfoObject")
+                .name("_pageInfoObject")
                 .field(newFieldDefinition()
                         .name("hasNextPage")
                         .dataFetcher(dataFetcher)
@@ -158,7 +158,7 @@ public class ModelBuilder {
         resolveInputObjectRelationships();
 
         /* Construct root object */
-        GraphQLObjectType.Builder root = newObject().name("__root");
+        GraphQLObjectType.Builder root = newObject().name("_root");
         for (Class<?> clazz : rootClasses) {
             String entityName = dictionary.getJsonAliasFor(clazz);
             root.field(newFieldDefinition()
@@ -175,7 +175,7 @@ public class ModelBuilder {
         }
 
         GraphQLObjectType queryRoot = root.build();
-        GraphQLObjectType mutationRoot = root.name("__mutation_root").build();
+        GraphQLObjectType mutationRoot = root.name("_mutation_root").build();
 
         /*
          * Walk the object graph (avoiding cycles) and construct the GraphQL output object types.
@@ -234,12 +234,12 @@ public class ModelBuilder {
             return queryObjectRegistry.get(entityClass);
         }
 
-        log.info("Building query object for {}", entityClass.getName());
+        log.debug("Building query object for {}", entityClass.getName());
 
         String entityName = dictionary.getJsonAliasFor(entityClass);
 
         GraphQLObjectType.Builder builder = newObject()
-                .name("__node__" + entityName);
+                .name("_node__" + entityName);
 
         String id = dictionary.getIdFieldName(entityClass);
 
@@ -314,7 +314,7 @@ public class ModelBuilder {
 
     private GraphQLList buildEdgesObject(String relationName, GraphQLOutputType entityType) {
         return new GraphQLList(newObject()
-                .name("__edges__" + relationName)
+                .name("_edges__" + relationName)
                 .field(newFieldDefinition()
                         .name("node")
                         .dataFetcher(dataFetcher)
@@ -336,12 +336,11 @@ public class ModelBuilder {
                 .name(ARGUMENT_DATA)
                 .type(new GraphQLList(argumentType))
                 .build();
-        } else {
-            return newArgument()
-                .name(ARGUMENT_DATA)
-                .type(argumentType)
-                .build();
         }
+        return newArgument()
+            .name(ARGUMENT_DATA)
+            .type(argumentType)
+            .build();
     }
 
     /**

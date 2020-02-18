@@ -6,7 +6,13 @@
 
 package com.yahoo.elide.triggers;
 
-import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.*;
+import static com.yahoo.elide.Elide.JSONAPI_CONTENT_TYPE;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.attr;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.attributes;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.datum;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.id;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.resource;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.type;
 import static com.yahoo.elide.initialization.StandardTestBinder.BILLING_SERVICE;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
@@ -20,12 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 
-import lombok.extern.slf4j.Slf4j;
-
-@Slf4j
 public class LifeCycleHookIT extends IntegrationTest {
-
-    private static final String JSONAPI_CONTENT_TYPE = "application/vnd.api+json";
 
     @BeforeEach
     public void resetMocks() {
@@ -52,10 +53,8 @@ public class LifeCycleHookIT extends IntegrationTest {
                                 )
                         )
                 )
-                .log().all()
                 .post("/customerInvoice")
                 .then()
-                .log().all()
                 .statusCode(HttpStatus.SC_CREATED)
                 .body("data.id", equalTo("1"))
                 .body("data.attributes.total", equalTo(1100))

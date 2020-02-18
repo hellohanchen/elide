@@ -5,7 +5,13 @@
  */
 package com.yahoo.elide.fieldLevelTest;
 
-import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.*;
+import static com.yahoo.elide.Elide.JSONAPI_CONTENT_TYPE;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.attr;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.attributes;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.datum;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.id;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.resource;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.type;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 
@@ -18,8 +24,6 @@ import org.junit.jupiter.api.Test;
 
 public class FieldLevelParentClassIdIT extends IntegrationTest {
     private final JsonParser jsonParser = new JsonParser();
-
-    private static final String JSONAPI_CONTENT_TYPE = "application/vnd.api+json";
 
     @Test
     public void testResponseCodeOnUpdate() {

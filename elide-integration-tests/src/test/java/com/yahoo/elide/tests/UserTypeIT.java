@@ -6,7 +6,13 @@
 
 package com.yahoo.elide.tests;
 
-import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.*;
+import static com.yahoo.elide.Elide.JSONAPI_CONTENT_TYPE;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.attr;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.attributes;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.datum;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.id;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.resource;
+import static com.yahoo.elide.contrib.testhelpers.jsonapi.JsonApiDSL.type;
 import static io.restassured.RestAssured.given;
 
 import com.yahoo.elide.contrib.testhelpers.jsonapi.elements.Resource;
@@ -59,16 +65,16 @@ class UserTypeIT extends IntegrationTest {
         );
 
         given()
-            .contentType("application/vnd.api+json")
-            .accept("application/vnd.api+json")
+            .contentType(JSONAPI_CONTENT_TYPE)
+            .accept(JSONAPI_CONTENT_TYPE)
             .body(datum(resource))
             .post("/person")
             .then()
             .statusCode(HttpStatus.SC_CREATED);
 
         String actual = given()
-            .contentType("application/vnd.api+json")
-            .accept("application/vnd.api+json")
+            .contentType(JSONAPI_CONTENT_TYPE)
+            .accept(JSONAPI_CONTENT_TYPE)
             .get("/person/1")
             .then()
             .statusCode(HttpStatus.SC_OK)
@@ -107,24 +113,24 @@ class UserTypeIT extends IntegrationTest {
         );
 
         given()
-            .contentType("application/vnd.api+json")
-            .accept("application/vnd.api+json")
+            .contentType(JSONAPI_CONTENT_TYPE)
+            .accept(JSONAPI_CONTENT_TYPE)
             .body(datum(original))
             .post("/person")
             .then()
             .statusCode(HttpStatus.SC_CREATED);
 
         given()
-            .contentType("application/vnd.api+json")
-            .accept("application/vnd.api+json")
+            .contentType(JSONAPI_CONTENT_TYPE)
+            .accept(JSONAPI_CONTENT_TYPE)
             .body(datum(modified))
             .patch("/person/2")
             .then()
             .statusCode(HttpStatus.SC_NO_CONTENT);
 
         String actual = given()
-            .contentType("application/vnd.api+json")
-            .accept("application/vnd.api+json")
+            .contentType(JSONAPI_CONTENT_TYPE)
+            .accept(JSONAPI_CONTENT_TYPE)
             .get("/person/2")
             .then()
             .statusCode(HttpStatus.SC_OK).extract().body().asString();
@@ -153,16 +159,16 @@ class UserTypeIT extends IntegrationTest {
 
 
         given()
-            .contentType("application/vnd.api+json")
-            .accept("application/vnd.api+json")
+            .contentType(JSONAPI_CONTENT_TYPE)
+            .accept(JSONAPI_CONTENT_TYPE)
             .body(datum(resource))
             .post("/person")
             .then()
             .statusCode(HttpStatus.SC_CREATED);
 
         String actual = given()
-            .contentType("application/vnd.api+json")
-            .accept("application/vnd.api+json")
+            .contentType(JSONAPI_CONTENT_TYPE)
+            .accept(JSONAPI_CONTENT_TYPE)
             .get("/person/3")
             .then()
             .statusCode(HttpStatus.SC_OK).extract().body().asString();
@@ -203,16 +209,16 @@ class UserTypeIT extends IntegrationTest {
         );
 
         given()
-            .contentType("application/vnd.api+json")
-            .accept("application/vnd.api+json")
+            .contentType(JSONAPI_CONTENT_TYPE)
+            .accept(JSONAPI_CONTENT_TYPE)
             .body(datum(resource))
             .post("/person")
             .then()
             .statusCode(HttpStatus.SC_CREATED);
 
         String actual = given()
-            .contentType("application/vnd.api+json")
-            .accept("application/vnd.api+json")
+            .contentType(JSONAPI_CONTENT_TYPE)
+            .accept(JSONAPI_CONTENT_TYPE)
             .get("/person/4")
             .then()
             .statusCode(HttpStatus.SC_OK).extract().body().asString();
